@@ -51,9 +51,32 @@
           <button id="btn-toggle-mode" class="text-xs font-mono uppercase tracking-widest text-zinc-500 hover:text-emerald-400 transition-colors">
             Upload Mode
           </button>
+          <button id="btn-open-settings" class="text-zinc-500 hover:text-emerald-400 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
         </div>
       </div>
     </header>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6">
+      <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" id="settings-overlay"></div>
+      <div class="relative bg-zinc-900 border border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl">
+        <h2 class="text-2xl font-bold mb-2">Settings</h2>
+        <p class="text-zinc-500 text-sm mb-6">Configure your Gemini API Key for the published app.</p>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-mono uppercase tracking-widest text-zinc-500 mb-2">Gemini API Key</label>
+            <input type="password" id="api-key-input" placeholder="Enter your API key..." class="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-emerald-500 outline-none transition-colors">
+            <p class="text-[10px] text-zinc-600 mt-2 italic">Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-emerald-500 hover:underline">aistudio.google.com</a></p>
+          </div>
+          <button id="btn-save-settings" class="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-2xl transition-all active:scale-95">
+            Save Configuration
+          </button>
+        </div>
+      </div>
+    </div>
 
     <main id="app-main-content" class="max-w-5xl mx-auto px-6 py-8">
       
@@ -221,21 +244,27 @@
     </main>
 
     <script type="module">
-      // Using ESM CDN for libraries since we deleted package.json
-      import { GoogleGenAI, Type, ThinkingLevel } from "https://esm.run/@google/genai";
-      import confetti from "https://esm.run/canvas-confetti";
+      import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+      import confetti from "canvas-confetti";
 
       // --- Gemini Service ---
-      // Note: Without Vite/package.json, we can't easily inject the API key.
-      // We'll try to get it from a global or prompt the user if needed.
-      const API_KEY = window.GEMINI_API_KEY || ""; 
+      function getApiKey() {
+        // 1. Try environment variable (Vite/AI Studio)
+        const envKey = process.env.GEMINI_API_KEY;
+        if (envKey && envKey !== "undefined") return envKey;
+        
+        // 2. Try localStorage (Published/Exported app)
+        return localStorage.getItem('gemini_api_key') || "";
+      }
 
       async function analyzeKumonSheet(base64Image) {
-        if (!API_KEY) {
-          alert("Gemini API Key is missing. Please provide it to use the AI features.");
-          throw new Error("API Key missing");
+        const apiKey = getApiKey();
+        if (!apiKey) {
+          elements.settingsModal.classList.remove('hidden');
+          throw new Error("Gemini API Key is missing");
         }
-        const ai = new GoogleGenAI({ apiKey: API_KEY });
+        
+        const ai = new GoogleGenAI({ apiKey });
         const model = "gemini-3-flash-preview";
         const prompt = `
           Analyze this Kumon math sheet image. 
@@ -416,11 +445,19 @@
         analysisSummary: document.getElementById('analysis-summary'),
         resultsList: document.getElementById('results-list'),
         btnExportHtml: document.getElementById('btn-export-html-report'),
+        settingsModal: document.getElementById('settings-modal'),
+        settingsOverlay: document.getElementById('settings-overlay'),
+        btnOpenSettings: document.getElementById('btn-open-settings'),
+        btnSaveSettings: document.getElementById('btn-save-settings'),
+        apiKeyInput: document.getElementById('api-key-input'),
       };
 
       function init() {
         const saved = localStorage.getItem('kumon_history');
         if (saved) history = JSON.parse(saved);
+
+        const savedKey = localStorage.getItem('gemini_api_key');
+        if (savedKey) elements.apiKeyInput.value = savedKey;
         
         elements.btnToggleHistory.onclick = toggleHistory;
         elements.btnToggleMode.onclick = toggleMode;
@@ -429,9 +466,24 @@
         elements.fileInput.onchange = handleFileUpload;
         elements.btnReset.onclick = reset;
         elements.btnExportHtml.onclick = exportToHtml;
+
+        elements.btnOpenSettings.onclick = () => elements.settingsModal.classList.remove('hidden');
+        elements.settingsOverlay.onclick = () => elements.settingsModal.classList.add('hidden');
+        elements.btnSaveSettings.onclick = saveSettings;
         
         startCamera();
         renderHistory();
+      }
+
+      function saveSettings() {
+        const key = elements.apiKeyInput.value.trim();
+        if (key) {
+          localStorage.setItem('gemini_api_key', key);
+          elements.settingsModal.classList.add('hidden');
+          alert("Settings saved! You can now use the AI features.");
+        } else {
+          alert("Please enter a valid API key.");
+        }
       }
 
       async function startCamera() {
