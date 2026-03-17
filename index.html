@@ -1,630 +1,309 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>KUMON AI - Grading Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-              mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
-            },
-          }
-        }
-      }
-    </script>
-    <style type="text/tailwindcss">
-      @layer base {
-        body {
-          @apply antialiased bg-[#0a0a0a] text-zinc-100 selection:bg-emerald-500/30 min-h-screen;
-        }
-      }
-      .line-clamp-1 {
-        display: -webkit-box;
-        -webkit-line-clamp: 1;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-      }
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+        body { font-family: 'Nunito', sans-serif; background-color: #0a0a0a; color: #f4f4f5; overflow-x: hidden; touch-action: manipulation; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .emerald-glow { box-shadow: 0 0 20px rgba(16, 185, 129, 0.2); }
+        #videoStream { width: 100%; height: 100%; object-fit: cover; }
+        .loader { border: 3px solid rgba(16, 185, 129, 0.1); border-top: 3px solid #10b981; border-radius: 50%; width: 24px; height: 24px; animation: spin 0.8s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  </head>
-  <body>
-    
+</head>
+<body class="min-h-screen selection:bg-emerald-500/30">
+
     <!-- Header -->
     <header class="border-b border-white/5 bg-black/40 backdrop-blur-xl sticky top-0 z-50">
-      <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-black"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="M7 12h10"/><path d="M12 7v10"/></svg>
-          </div>
-          <h1 class="font-bold tracking-tight text-lg">KUMON<span class="text-emerald-500">AI</span></h1>
+        <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    <i class="fa-solid fa- brain text-black text-sm"></i>
+                </div>
+                <h1 class="font-bold tracking-tight text-lg uppercase">KUMON<span class="text-emerald-500">AI</span></h1>
+            </div>
+            <button id="toggleHistory" class="text-xs font-mono uppercase tracking-widest text-zinc-500 hover:text-emerald-400 transition-colors flex items-center gap-2">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>History</span>
+            </button>
         </div>
-        <div class="flex items-center gap-6">
-          <button id="btn-toggle-history" class="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-zinc-500 hover:text-emerald-400 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
-            <span id="history-btn-text">History</span>
-          </button>
-          <button id="btn-toggle-mode" class="text-xs font-mono uppercase tracking-widest text-zinc-500 hover:text-emerald-400 transition-colors">
-            Upload Mode
-          </button>
-          <button id="btn-open-settings" class="text-zinc-500 hover:text-emerald-400 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-          </button>
-        </div>
-      </div>
     </header>
 
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6">
-      <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" id="settings-overlay"></div>
-      <div class="relative bg-zinc-900 border border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl">
-        <h2 class="text-2xl font-bold mb-2">Settings</h2>
-        <p class="text-zinc-500 text-sm mb-6">Configure your Gemini API Key for the published app.</p>
+    <main class="max-w-5xl mx-auto px-4 py-6 md:py-8">
         
-        <div class="space-y-4">
-          <div>
-            <label class="block text-xs font-mono uppercase tracking-widest text-zinc-500 mb-2">Gemini API Key</label>
-            <input type="password" id="api-key-input" placeholder="Enter your API key..." class="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-emerald-500 outline-none transition-colors">
-            <p class="text-[10px] text-zinc-600 mt-2 italic">Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-emerald-500 hover:underline">aistudio.google.com</a></p>
-          </div>
-          <button id="btn-save-settings" class="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-2xl transition-all active:scale-95">
-            Save Configuration
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <main id="app-main-content" class="max-w-5xl mx-auto px-6 py-8">
-      
-      <!-- History View (Hidden by default) -->
-      <section id="history-view" class="hidden space-y-8">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-2xl font-bold tracking-tight">Your Progress</h2>
-            <p class="text-zinc-500 text-sm mt-1">Review your past Kumon checks</p>
-          </div>
-          <div class="bg-zinc-900 px-4 py-2 rounded-xl border border-white/5">
-            <p class="text-[10px] font-mono text-zinc-500 uppercase">Total Sessions</p>
-            <p id="history-count" class="text-xl font-bold">0</p>
-          </div>
-        </div>
-        <div id="history-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <!-- History items injected here -->
-        </div>
-      </section>
-
-      <!-- Main Interaction View -->
-      <div id="main-view" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-        <!-- Left Column: Input -->
-        <section id="input-section" class="space-y-6">
-          <div class="relative aspect-[3/4] bg-zinc-900 rounded-3xl overflow-hidden border border-white/5 shadow-2xl group">
+        <!-- Main Interface -->
+        <div id="mainView" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             
-            <!-- Camera Container -->
-            <div id="camera-container" class="h-full w-full">
-              <video id="webcam-video" autoplay playsinline class="h-full w-full object-cover grayscale-[0.2] contrast-[1.1]"></video>
-              <canvas id="capture-canvas" class="hidden"></canvas>
-              <div class="absolute inset-0 pointer-events-none border-[40px] border-black/20">
-                <div class="h-full w-full border border-emerald-500/30 rounded-xl relative">
-                  <div class="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-emerald-500"></div>
-                  <div class="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-emerald-500"></div>
-                  <div class="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-emerald-500"></div>
-                  <div class="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-emerald-500"></div>
+            <!-- Left Column: Camera/Capture -->
+            <section class="space-y-6">
+                <div class="relative aspect-[3/4] bg-zinc-900 rounded-[2rem] overflow-hidden border border-white/5 shadow-2xl group">
+                    
+                    <!-- Live Camera Feed -->
+                    <div id="cameraContainer" class="h-full w-full relative">
+                        <video id="videoStream" autoplay playsinline muted class="grayscale-[0.1] contrast-[1.05]"></video>
+                        
+                        <!-- Camera Overlay UI -->
+                        <div class="absolute inset-0 pointer-events-none border-[30px] border-black/20">
+                            <div class="h-full w-full border border-emerald-500/30 rounded-xl relative">
+                                <div class="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-emerald-500"></div>
+                                <div class="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-emerald-500"></div>
+                                <div class="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-emerald-500"></div>
+                                <div class="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-emerald-500"></div>
+                            </div>
+                        </div>
+
+                        <!-- Shutter Button -->
+                        <div class="absolute bottom-8 left-0 right-0 flex justify-center pointer-events-auto">
+                            <button id="captureBtn" class="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-2xl hover:scale-105 active:scale-90 transition-all border-8 border-zinc-800">
+                                <div class="w-12 h-12 bg-zinc-900 rounded-full flex items-center justify-center group-hover:bg-emerald-500 transition-colors">
+                                    <i class="fa-solid fa-camera text-white"></i>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Preview/Review Layer -->
+                    <div id="previewLayer" class="hidden absolute inset-0 bg-black">
+                        <img id="previewImage" src="" class="h-full w-full object-contain">
+                        <div class="absolute top-6 right-6 flex gap-2">
+                            <button id="resetBtn" class="p-4 bg-black/60 backdrop-blur-md rounded-2xl text-white hover:bg-rose-500 transition-colors border border-white/10">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-              </div>
-            </div>
 
-            <!-- Upload Container (Hidden by default) -->
-            <div id="upload-container" class="hidden h-full w-full flex flex-col items-center justify-center p-12 text-center">
-              <div class="w-20 h-20 bg-emerald-500/10 rounded-3xl flex items-center justify-center mb-6 border border-emerald-500/20">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-500"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-              </div>
-              <h3 class="text-xl font-bold mb-2">Upload Worksheet</h3>
-              <p class="text-zinc-500 text-sm mb-8">Select a photo of your Kumon sheet to begin grading</p>
-              <button id="btn-select-file" class="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-2xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95">
-                Select Photo
-              </button>
-              <input type="file" id="file-input" class="hidden" accept="image/*">
-            </div>
-
-            <!-- Preview Container (Hidden by default) -->
-            <div id="preview-container" class="hidden absolute inset-0 bg-black">
-              <img id="preview-image" src="" class="h-full w-full object-contain">
-              <div class="absolute top-6 right-6">
-                <button id="btn-reset" class="p-3 bg-black/50 backdrop-blur-md rounded-2xl text-white hover:bg-rose-500 transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Action Button -->
-          <div id="camera-controls" class="flex justify-center">
-            <button id="btn-capture" class="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-2xl shadow-white/10 hover:scale-105 active:scale-90 transition-all group">
-              <div class="w-16 h-16 rounded-full border-4 border-black flex items-center justify-center">
-                <div class="w-12 h-12 bg-black rounded-full group-hover:bg-emerald-500 transition-colors"></div>
-              </div>
-            </button>
-          </div>
-
-          <!-- Tips -->
-          <div class="bg-zinc-900/50 border border-white/5 rounded-2xl p-6">
-            <h3 class="text-xs font-mono uppercase tracking-[0.2em] text-zinc-500 mb-4">Accuracy Tips</h3>
-            <ul class="space-y-3 text-sm text-zinc-400">
-              <li class="flex gap-3">
-                <span class="text-emerald-500 font-mono">01</span>
-                <span class="text-rose-400/80">Avoid Blur:</span> Hold your phone steady until the photo is taken.
-              </li>
-              <li class="flex gap-3">
-                <span class="text-emerald-500 font-mono">02</span>
-                <span class="text-amber-400/80">Bright Light:</span> Shadows make numbers hard for AI to read.
-              </li>
-              <li class="flex gap-3">
-                <span class="text-emerald-500 font-mono">03</span>
-                <span class="text-blue-400/80">Flat Paper:</span> Folds can hide parts of your numbers.
-              </li>
-            </ul>
-          </div>
-        </section>
-
-        <!-- Right Column: Results -->
-        <section id="results-section" class="space-y-6">
-          <div class="bg-zinc-900 rounded-3xl border border-white/5 overflow-hidden flex flex-col min-h-[500px]">
-            <div class="p-6 border-b border-white/5 flex items-center justify-between bg-zinc-900/50">
-              <h2 class="font-bold text-lg flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-500"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
-                Analysis Results
-              </h2>
-              <div id="processing-indicator" class="hidden flex items-center gap-2 text-emerald-500 text-xs font-mono">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>
-                PROCESSING...
-              </div>
-            </div>
-
-            <div id="results-content" class="flex-1 p-6 overflow-y-auto">
-              <!-- Initial State -->
-              <div id="results-empty" class="h-full flex flex-col items-center justify-center text-center py-12">
-                <div class="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-4 opacity-50">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-zinc-500"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="M7 12h10"/><path d="M12 7v10"/></svg>
+                <!-- Secondary Actions -->
+                <div class="flex gap-4">
+                    <label class="flex-1 bg-zinc-900 border border-white/5 p-4 rounded-2xl flex items-center justify-center gap-3 cursor-pointer hover:bg-zinc-800 transition-all active:scale-95">
+                        <i class="fa-solid fa-upload text-emerald-500"></i>
+                        <span class="text-sm font-bold">Upload File</span>
+                        <input type="file" id="fileInput" accept="image/*" class="hidden">
+                    </label>
+                    <button id="switchCam" class="p-4 bg-zinc-900 border border-white/5 rounded-2xl text-emerald-500 hover:bg-zinc-800 transition-all">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                    </button>
                 </div>
-                <p class="text-zinc-500 max-w-[200px]">Capture a sheet to begin the AI analysis</p>
-              </div>
 
-              <!-- Loading State -->
-              <div id="results-loading" class="hidden space-y-4">
-                <div class="h-16 bg-zinc-800/50 rounded-xl animate-pulse"></div>
-                <div class="h-16 bg-zinc-800/50 rounded-xl animate-pulse"></div>
-                <div class="h-16 bg-zinc-800/50 rounded-xl animate-pulse"></div>
-                <div class="h-16 bg-zinc-800/50 rounded-xl animate-pulse"></div>
-              </div>
+                <!-- Guidance -->
+                <div class="bg-zinc-900/50 border border-white/5 rounded-2xl p-6">
+                    <h3 class="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-4">Accuracy Tips</h3>
+                    <ul class="space-y-3 text-sm text-zinc-400">
+                        <li class="flex gap-3"><span class="text-emerald-500 font-mono">01</span><span>Keep paper flat on table</span></li>
+                        <li class="flex gap-3"><span class="text-emerald-500 font-mono">02</span><span>Ensure plenty of top-down light</span></li>
+                    </ul>
+                </div>
+            </section>
 
-              <!-- Analysis View -->
-              <div id="analysis-view" class="hidden space-y-6">
+            <!-- Right Column: Results -->
+            <section class="space-y-6">
+                <div class="bg-zinc-900 rounded-[2rem] border border-white/5 overflow-hidden flex flex-col min-h-[500px] shadow-2xl">
+                    <div class="p-6 border-b border-white/5 flex items-center justify-between bg-zinc-900/50">
+                        <h2 class="font-bold text-lg flex items-center gap-2">
+                            <i class="fa-solid fa-magnifying-glass-chart text-emerald-500"></i>
+                            Analysis
+                        </h2>
+                        <div id="loadingStatus" class="hidden flex items-center gap-2 text-emerald-500 text-xs font-mono">
+                            <div class="loader"></div>
+                            <span>GRADING...</span>
+                        </div>
+                    </div>
+
+                    <div id="resultsContainer" class="flex-1 p-6 overflow-y-auto">
+                        <!-- Empty State -->
+                        <div id="emptyState" class="h-full flex flex-col items-center justify-center text-center py-20 opacity-40">
+                            <i class="fa-solid fa-file-signature text-5xl mb-4"></i>
+                            <p class="text-sm max-w-[200px]">Snap your worksheet to start grading</p>
+                        </div>
+
+                        <!-- Results View -->
+                        <div id="analysisView" class="hidden space-y-6">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="bg-zinc-800/50 p-5 rounded-3xl border border-white/5">
+                                    <p class="text-[10px] font-mono text-zinc-500 uppercase mb-1">Checked</p>
+                                    <p id="totalCount" class="text-3xl font-black">0</p>
+                                </div>
+                                <div class="bg-emerald-500/10 p-5 rounded-3xl border border-emerald-500/20">
+                                    <p class="text-[10px] font-mono text-emerald-500 uppercase mb-1">Score</p>
+                                    <p id="correctCount" class="text-3xl font-black text-emerald-400">0</p>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-3" id="resultsList"></div>
+                            
+                            <button onclick="resetApp()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-5 rounded-2xl transition-all shadow-xl shadow-emerald-500/10 active:scale-95">
+                                START NEW CHECK
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- History Overlay -->
+        <div id="historyLayer" class="hidden fixed inset-0 z-[60] bg-black/90 backdrop-blur-md p-6 overflow-y-auto">
+            <div class="max-w-xl mx-auto space-y-6">
                 <div class="flex items-center justify-between">
-                  <h2 class="text-sm font-bold text-zinc-500 uppercase tracking-widest">Grading Results</h2>
-                  <button id="btn-export-html-report" class="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-medium transition-colors border border-zinc-700">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                    Export HTML
-                  </button>
+                    <h2 class="text-2xl font-black">Past Checks</h2>
+                    <button id="closeHistory" class="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
                 </div>
-                
-                <div class="grid grid-cols-2 gap-4">
-                  <div class="bg-zinc-800/50 p-4 rounded-2xl border border-white/5">
-                    <p class="text-xs font-mono text-zinc-500 uppercase mb-1">Total Checked</p>
-                    <p id="stat-total" class="text-3xl font-bold">0</p>
-                  </div>
-                  <div class="bg-emerald-500/10 p-4 rounded-2xl border border-emerald-500/20">
-                    <p class="text-xs font-mono text-emerald-500 uppercase mb-1">Correct</p>
-                    <p id="stat-correct" class="text-3xl font-bold text-emerald-400">0</p>
-                  </div>
-                </div>
-
-                <div id="analysis-summary" class="bg-zinc-800/30 p-4 rounded-xl border border-white/5 italic text-zinc-400 text-sm">
-                  <!-- Summary text -->
-                </div>
-
-                <div class="space-y-2">
-                  <div class="flex items-center justify-between px-1">
-                    <h3 class="text-xs font-mono uppercase tracking-widest text-zinc-500">Problem Breakdown</h3>
-                    <p class="text-[10px] text-zinc-600 italic">AI misread? Try a brighter photo.</p>
-                  </div>
-                  <div id="results-list" class="space-y-2">
-                    <!-- Result items injected here -->
-                  </div>
-                </div>
-              </div>
+                <div id="historyItems" class="space-y-4"></div>
             </div>
-          </div>
-        </section>
-      </div>
+        </div>
     </main>
 
-    <script type="module">
-      import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
-      import confetti from "canvas-confetti";
+    <canvas id="captureCanvas" class="hidden"></canvas>
 
-      // --- Gemini Service ---
-      function getApiKey() {
-        // 1. Try environment variable (Vite/AI Studio)
-        const envKey = process.env.GEMINI_API_KEY;
-        if (envKey && envKey !== "undefined") return envKey;
-        
-        // 2. Try localStorage (Published/Exported app)
-        return localStorage.getItem('gemini_api_key') || "";
-      }
+    <script>
+        const apiKey = "";
+        let stream = null;
+        let useFront = false;
+        let history = JSON.parse(localStorage.getItem('kumon_history') || '[]');
 
-      async function analyzeKumonSheet(base64Image) {
-        const apiKey = getApiKey();
-        if (!apiKey) {
-          elements.settingsModal.classList.remove('hidden');
-          throw new Error("Gemini API Key is missing");
+        const ui = {
+            video: document.getElementById('videoStream'),
+            captureBtn: document.getElementById('captureBtn'),
+            resetBtn: document.getElementById('resetBtn'),
+            switchBtn: document.getElementById('switchCam'),
+            fileInput: document.getElementById('fileInput'),
+            previewLayer: document.getElementById('previewLayer'),
+            previewImg: document.getElementById('previewImage'),
+            loadingStatus: document.getElementById('loadingStatus'),
+            emptyState: document.getElementById('emptyState'),
+            analysisView: document.getElementById('analysisView'),
+            resultsList: document.getElementById('resultsList'),
+            totalCount: document.getElementById('totalCount'),
+            correctCount: document.getElementById('correctCount'),
+            toggleHistory: document.getElementById('toggleHistory'),
+            historyLayer: document.getElementById('historyLayer'),
+            closeHistory: document.getElementById('closeHistory'),
+            historyItems: document.getElementById('historyItems'),
+            canvas: document.getElementById('captureCanvas')
+        };
+
+        // Start Camera
+        async function initCamera() {
+            if (stream) stream.getTracks().forEach(t => t.stop());
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: useFront ? "user" : "environment", width: { ideal: 1280 } } 
+                });
+                ui.video.srcObject = stream;
+            } catch (err) {
+                console.error("Camera failed", err);
+            }
         }
-        
-        const ai = new GoogleGenAI({ apiKey });
-        const model = "gemini-3-flash-preview";
-        const prompt = `
-          Analyze this Kumon math sheet image. 
-          
-          CRITICAL VERIFICATION PROCESS:
-          1. For every problem found:
-             a. Transcribe the problem exactly as written (e.g., "2/3 - 1/4").
-             b. INDEPENDENTLY calculate the mathematically correct answer.
-             c. Transcribe the user's HANDWRITTEN answer.
-             d. Compare your calculated answer with the user's answer.
-             e. Set 'isCorrect' to true ONLY if they are an exact match.
-          
-          2. If the user's answer is wrong, do NOT provide the correct answer in the output.
-          3. Return the data in the specified JSON format.
-        `;
 
-        const response = await ai.models.generateContent({
-          model,
-          contents: [
-            {
-              parts: [
-                { text: prompt },
-                {
-                  inlineData: {
-                    mimeType: "image/jpeg",
-                    data: base64Image.split(',')[1] || base64Image
-                  }
-                }
-              ]
+        // Capture Logic
+        ui.captureBtn.onclick = () => {
+            const ctx = ui.canvas.getContext('2d');
+            ui.canvas.width = ui.video.videoWidth;
+            ui.canvas.height = ui.video.videoHeight;
+            ctx.drawImage(ui.video, 0, 0);
+            const dataUrl = ui.canvas.toDataURL('image/jpeg', 0.8);
+            showPreview(dataUrl);
+        };
+
+        function showPreview(url) {
+            ui.previewImg.src = url;
+            ui.previewLayer.classList.remove('hidden');
+            processSheet(url);
+        }
+
+        function resetApp() {
+            ui.previewLayer.classList.add('hidden');
+            ui.analysisView.classList.add('hidden');
+            ui.emptyState.classList.remove('hidden');
+            ui.loadingStatus.classList.add('hidden');
+            initCamera();
+        }
+
+        ui.resetBtn.onclick = resetApp;
+        ui.switchBtn.onclick = () => { useFront = !useFront; initCamera(); };
+        ui.fileInput.onchange = (e) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => showPreview(ev.target.result);
+            reader.readAsDataURL(e.target.files[0]);
+        };
+
+        // AI Logic
+        async function processSheet(b64) {
+            ui.loadingStatus.classList.remove('hidden');
+            ui.emptyState.classList.add('hidden');
+            
+            const prompt = "Grade this math worksheet. Return JSON array: [{'q':'Problem','user':'Detected Answer','ok':true/false}]";
+            
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: "image/jpeg", data: b64.split(',')[1] } }] }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+
+                const json = await res.json();
+                const data = JSON.parse(json.candidates[0].content.parts[0].text);
+                renderResults(data);
+                saveHistory(data);
+            } catch (err) {
+                alert("AI error. Please ensure the image is bright and sharp.");
+                resetApp();
             }
-          ],
-          config: {
-            thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                totalProblems: { type: Type.NUMBER },
-                correctCount: { type: Type.NUMBER },
-                results: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      problem: { type: Type.STRING },
-                      userAnswer: { type: Type.STRING },
-                      isCorrect: { type: Type.BOOLEAN }
-                    },
-                    required: ["problem", "userAnswer", "isCorrect"]
-                  }
-                },
-                summary: { type: Type.STRING }
-              },
-              required: ["totalProblems", "correctCount", "results", "summary"]
-            }
-          }
-        });
+        }
 
-        return JSON.parse(response.text || "{}");
-      }
-
-      // --- Image Processor ---
-      async function preprocessImage(base64) {
-        return new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-              resolve({ processed: base64, isTooDark: false });
-              return;
-            }
-
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
-
-            const brightness = getAverageBrightness(ctx, canvas.width, canvas.height);
-            const isTooDark = brightness < 60;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (isTooDark) {
-              ctx.filter = 'brightness(2.2) contrast(1.8) saturate(0) grayscale(1)';
-            } else {
-              ctx.filter = 'brightness(1.1) contrast(1.5) saturate(0) grayscale(1)';
-            }
-            ctx.drawImage(img, 0, 0);
-
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const sharpenedData = sharpen(imageData, canvas.width, canvas.height);
-            ctx.putImageData(sharpenedData, 0, 0);
-
-            resolve({ 
-              processed: canvas.toDataURL('image/jpeg', 0.9),
-              isTooDark 
+        function renderResults(data) {
+            ui.loadingStatus.classList.add('hidden');
+            ui.analysisView.classList.remove('hidden');
+            ui.resultsList.innerHTML = '';
+            
+            const ok = data.filter(d => d.ok).length;
+            ui.totalCount.innerText = data.length;
+            ui.correctCount.innerText = `${ok}/${data.length}`;
+            
+            data.forEach(item => {
+                const div = document.createElement('div');
+                div.className = `p-4 rounded-2xl border flex items-center justify-between ${item.ok ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`;
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid ${item.ok ? 'fa-circle-check text-emerald-500' : 'fa-circle-xmark text-rose-500'} text-xl"></i>
+                        <div>
+                            <p class="font-bold text-sm text-zinc-200">${item.q}</p>
+                            <p class="text-[10px] text-zinc-500 font-mono">DETECTED: ${item.user}</p>
+                        </div>
+                    </div>
+                `;
+                ui.resultsList.appendChild(div);
             });
-          };
-          img.onerror = reject;
-          img.src = base64;
-        });
-      }
-
-      function getAverageBrightness(ctx, w, h) {
-        const data = ctx.getImageData(0, 0, w, h).data;
-        let sum = 0;
-        for (let i = 0; i < data.length; i += 4) {
-          sum += (data[i] + data[i+1] + data[i+2]) / 3;
         }
-        return sum / (w * h);
-      }
 
-      function sharpen(imageData, w, h) {
-        const weights = [0, -1, 0, -1, 5, -1, 0, -1, 0];
-        const side = 3;
-        const halfSide = 1;
-        const src = imageData.data;
-        const output = new ImageData(w, h);
-        const dst = output.data;
-
-        for (let y = 0; y < h; y++) {
-          for (let x = 0; x < w; x++) {
-            const dstOff = (y * w + x) * 4;
-            let r = 0, g = 0, b = 0;
-            for (let cy = 0; cy < side; cy++) {
-              for (let cx = 0; cx < side; cx++) {
-                const scy = y + cy - halfSide;
-                const scx = x + cx - halfSide;
-                if (scy >= 0 && scy < h && scx >= 0 && scx < w) {
-                  const srcOff = (scy * w + scx) * 4;
-                  const wt = weights[cy * side + cx];
-                  r += src[srcOff] * wt;
-                  g += src[srcOff + 1] * wt;
-                  b += src[srcOff + 2] * wt;
-                }
-              }
-            }
-            dst[dstOff] = r;
-            dst[dstOff + 1] = g;
-            dst[dstOff + 2] = b;
-            dst[dstOff + 3] = src[dstOff + 3];
-          }
+        // History Management
+        function saveHistory(data) {
+            const entry = { date: new Date().toLocaleString(), score: `${data.filter(d => d.ok).length}/${data.length}` };
+            history.unshift(entry);
+            localStorage.setItem('kumon_history', JSON.stringify(history.slice(0, 10)));
         }
-        return output;
-      }
 
-      // --- Main App Logic ---
-      let currentImage = null;
-      let currentAnalysis = null;
-      let mode = 'camera';
-      let showHistory = false;
-      let history = [];
-      let stream = null;
+        ui.toggleHistory.onclick = () => {
+            ui.historyItems.innerHTML = history.map(h => `
+                <div class="bg-zinc-900 border border-white/5 p-4 rounded-2xl flex justify-between items-center">
+                    <span class="text-xs font-mono text-zinc-400">${h.date}</span>
+                    <span class="font-black text-emerald-400">${h.score}</span>
+                </div>
+            `).join('') || '<p class="text-center text-zinc-500">No history yet</p>';
+            ui.historyLayer.classList.remove('hidden');
+        };
 
-      const elements = {
-        btnToggleHistory: document.getElementById('btn-toggle-history'),
-        historyBtnText: document.getElementById('history-btn-text'),
-        btnToggleMode: document.getElementById('btn-toggle-mode'),
-        historyView: document.getElementById('history-view'),
-        mainView: document.getElementById('main-view'),
-        historyGrid: document.getElementById('history-grid'),
-        historyCount: document.getElementById('history-count'),
-        cameraContainer: document.getElementById('camera-container'),
-        uploadContainer: document.getElementById('upload-container'),
-        previewContainer: document.getElementById('preview-container'),
-        webcamVideo: document.getElementById('webcam-video'),
-        captureCanvas: document.getElementById('capture-canvas'),
-        previewImage: document.getElementById('preview-image'),
-        btnCapture: document.getElementById('btn-capture'),
-        btnSelectFile: document.getElementById('btn-select-file'),
-        fileInput: document.getElementById('file-input'),
-        btnReset: document.getElementById('btn-reset'),
-        processingIndicator: document.getElementById('processing-indicator'),
-        resultsEmpty: document.getElementById('results-empty'),
-        resultsLoading: document.getElementById('results-loading'),
-        analysisView: document.getElementById('analysis-view'),
-        statTotal: document.getElementById('stat-total'),
-        statCorrect: document.getElementById('stat-correct'),
-        analysisSummary: document.getElementById('analysis-summary'),
-        resultsList: document.getElementById('results-list'),
-        btnExportHtml: document.getElementById('btn-export-html-report'),
-        settingsModal: document.getElementById('settings-modal'),
-        settingsOverlay: document.getElementById('settings-overlay'),
-        btnOpenSettings: document.getElementById('btn-open-settings'),
-        btnSaveSettings: document.getElementById('btn-save-settings'),
-        apiKeyInput: document.getElementById('api-key-input'),
-      };
+        ui.closeHistory.onclick = () => ui.historyLayer.classList.add('hidden');
 
-      function init() {
-        const saved = localStorage.getItem('kumon_history');
-        if (saved) history = JSON.parse(saved);
-
-        const savedKey = localStorage.getItem('gemini_api_key');
-        if (savedKey) elements.apiKeyInput.value = savedKey;
-        
-        elements.btnToggleHistory.onclick = toggleHistory;
-        elements.btnToggleMode.onclick = toggleMode;
-        elements.btnCapture.onclick = captureImage;
-        elements.btnSelectFile.onclick = () => elements.fileInput.click();
-        elements.fileInput.onchange = handleFileUpload;
-        elements.btnReset.onclick = reset;
-        elements.btnExportHtml.onclick = exportToHtml;
-
-        elements.btnOpenSettings.onclick = () => elements.settingsModal.classList.remove('hidden');
-        elements.settingsOverlay.onclick = () => elements.settingsModal.classList.add('hidden');
-        elements.btnSaveSettings.onclick = saveSettings;
-        
-        startCamera();
-        renderHistory();
-      }
-
-      function saveSettings() {
-        const key = elements.apiKeyInput.value.trim();
-        if (key) {
-          localStorage.setItem('gemini_api_key', key);
-          elements.settingsModal.classList.add('hidden');
-          alert("Settings saved! You can now use the AI features.");
-        } else {
-          alert("Please enter a valid API key.");
-        }
-      }
-
-      async function startCamera() {
-        if (mode !== 'camera') return;
-        try {
-          if (stream) stream.getTracks().forEach(t => t.stop());
-          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-          elements.webcamVideo.srcObject = stream;
-        } catch (err) { console.error(err); }
-      }
-
-      function stopCamera() {
-        if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-      }
-
-      function toggleHistory() {
-        showHistory = !showHistory;
-        elements.historyView.classList.toggle('hidden', !showHistory);
-        elements.mainView.classList.toggle('hidden', showHistory);
-        elements.historyBtnText.textContent = showHistory ? 'Close History' : 'History';
-        if (showHistory) stopCamera(); else if (mode === 'camera' && !currentImage) startCamera();
-      }
-
-      function toggleMode() {
-        mode = mode === 'camera' ? 'upload' : 'camera';
-        elements.btnToggleMode.textContent = mode === 'camera' ? 'Upload Mode' : 'Camera Mode';
-        elements.cameraContainer.classList.toggle('hidden', mode !== 'camera');
-        elements.uploadContainer.classList.toggle('hidden', mode === 'camera');
-        elements.btnCapture.parentElement.classList.toggle('hidden', mode !== 'camera');
-        reset();
-      }
-
-      function captureImage() {
-        const canvas = elements.captureCanvas;
-        const ctx = canvas.getContext('2d');
-        canvas.width = elements.webcamVideo.videoWidth;
-        canvas.height = elements.webcamVideo.videoHeight;
-        ctx.drawImage(elements.webcamVideo, 0, 0);
-        processImage(canvas.toDataURL('image/jpeg'));
-      }
-
-      function handleFileUpload(e) {
-        const file = e.target.files[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = () => processImage(reader.result);
-          reader.readAsDataURL(file);
-        }
-      }
-
-      async function processImage(base64) {
-        currentImage = base64;
-        elements.previewImage.src = base64;
-        elements.previewContainer.classList.remove('hidden');
-        stopCamera();
-        setLoading(true);
-        try {
-          const { processed } = await preprocessImage(base64);
-          const result = await analyzeKumonSheet(processed);
-          currentAnalysis = result;
-          renderAnalysis(result);
-          history = [{ ...result, id: Date.now().toString(), timestamp: Date.now(), image: base64 }, ...history].slice(0, 20);
-          localStorage.setItem('kumon_history', JSON.stringify(history));
-          renderHistory();
-          if (result.correctCount === result.totalProblems && result.totalProblems > 0) {
-            confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#10b981', '#ffffff'] });
-          }
-        } catch (err) { alert("Analysis failed."); } finally { setLoading(false); }
-      }
-
-      function reset() {
-        currentImage = null; currentAnalysis = null;
-        elements.previewContainer.classList.add('hidden');
-        elements.resultsEmpty.classList.remove('hidden');
-        elements.analysisView.classList.add('hidden');
-        elements.resultsLoading.classList.add('hidden');
-        elements.processingIndicator.classList.add('hidden');
-        if (mode === 'camera' && !showHistory) startCamera();
-      }
-
-      function setLoading(isLoading) {
-        elements.resultsEmpty.classList.toggle('hidden', isLoading);
-        elements.resultsLoading.classList.toggle('hidden', !isLoading);
-        elements.processingIndicator.classList.toggle('hidden', !isLoading);
-        if (!isLoading && currentAnalysis) elements.analysisView.classList.remove('hidden');
-      }
-
-      function renderAnalysis(analysis) {
-        elements.statTotal.textContent = analysis.totalProblems;
-        elements.statCorrect.textContent = analysis.correctCount;
-        elements.analysisSummary.textContent = `"${analysis.summary}"`;
-        elements.resultsList.innerHTML = analysis.results.map((res, idx) => `
-          <div class="flex items-center justify-between p-4 rounded-xl border ${res.isCorrect ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-rose-500/5 border-rose-500/10'}">
-            <div class="flex items-center gap-4">
-              <span class="text-xs font-mono text-zinc-600">#${idx + 1}</span>
-              <div>
-                <p class="text-sm font-medium text-zinc-300">${res.problem}</p>
-                <p class="text-xs text-zinc-500">Your answer: <span class="text-zinc-300 font-mono">${res.userAnswer}</span></p>
-              </div>
-            </div>
-            ${res.isCorrect ? '✓' : '✗'}
-          </div>
-        `).join('');
-      }
-
-      function renderHistory() {
-        elements.historyCount.textContent = history.length;
-        if (history.length === 0) {
-          elements.historyGrid.innerHTML = '<p class="col-span-full text-center text-zinc-500">No history yet</p>';
-          return;
-        }
-        elements.historyGrid.innerHTML = history.map(item => `
-          <div class="bg-zinc-900 rounded-2xl border border-white/5 overflow-hidden p-4 cursor-pointer hover:border-emerald-500/30 transition-colors" onclick="window.loadFromHistory('${item.id}')">
-            <div class="aspect-video bg-zinc-800 rounded-lg mb-3 overflow-hidden">
-              <img src="${item.image}" class="w-full h-full object-cover opacity-60">
-            </div>
-            <p class="text-xs font-mono text-zinc-500 mb-1">${new Date(item.timestamp).toLocaleDateString()}</p>
-            <p class="text-sm font-medium text-zinc-300 line-clamp-1">${item.summary}</p>
-            <p class="text-[10px] text-zinc-500 uppercase font-mono">${item.correctCount}/${item.totalProblems} Correct</p>
-          </div>
-        `).join('');
-      }
-
-      window.loadFromHistory = (id) => {
-        const item = history.find(h => h.id === id);
-        if (item) {
-          currentAnalysis = item; currentImage = item.image;
-          elements.previewImage.src = item.image;
-          elements.previewContainer.classList.remove('hidden');
-          renderAnalysis(item); toggleHistory();
-        }
-      };
-
-      function exportToHtml() {
-        if (!currentAnalysis || !currentImage) return;
-        const html = `<html><body style="background:#000;color:#fff;font-family:sans-serif;padding:20px"><h1>Report</h1><img src="${currentImage}" style="max-width:100%"><p>${currentAnalysis.summary}</p></body></html>`;
-        const blob = new Blob([html], { type: 'text/html' });
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'report.html'; a.click();
-      }
-
-      init();
+        window.onload = initCamera;
     </script>
-  </body>
+</body>
 </html>
