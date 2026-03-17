@@ -3,307 +3,353 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KUMON AI - Grading Assistant</title>
+    <title>KUMON AI | Grading Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
-        body { font-family: 'Nunito', sans-serif; background-color: #0a0a0a; color: #f4f4f5; overflow-x: hidden; touch-action: manipulation; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .emerald-glow { box-shadow: 0 0 20px rgba(16, 185, 129, 0.2); }
-        #videoStream { width: 100%; height: 100%; object-fit: cover; }
-        .loader { border: 3px solid rgba(16, 185, 129, 0.1); border-top: 3px solid #10b981; border-radius: 50%; width: 24px; height: 24px; animation: spin 0.8s linear infinite; }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #050505; color: #f4f4f5; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .emerald-glow { box-shadow: 0 0 30px rgba(16, 185, 129, 0.15); }
+        .loader { border: 2px solid rgba(16, 185, 129, 0.1); border-top: 2px solid #10b981; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #videoFeed { transform: scaleX(-1); }
     </style>
 </head>
-<body class="min-h-screen selection:bg-emerald-500/30">
+<body class="min-h-screen">
 
-    <!-- Header -->
-    <header class="border-b border-white/5 bg-black/40 backdrop-blur-xl sticky top-0 z-50">
-        <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                    <i class="fa-solid fa- brain text-black text-sm"></i>
-                </div>
-                <h1 class="font-bold tracking-tight text-lg uppercase">KUMON<span class="text-emerald-500">AI</span></h1>
+    <!-- Top Navigation -->
+    <header class="sticky top-0 z-50 glass border-b border-white/5 px-6 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                <i class="fa-solid fa-bolt text-black text-sm"></i>
             </div>
-            <button id="toggleHistory" class="text-xs font-mono uppercase tracking-widest text-zinc-500 hover:text-emerald-400 transition-colors flex items-center gap-2">
-                <i class="fa-solid fa-clock-rotate-left"></i>
-                <span>History</span>
+            <h1 class="font-extrabold tracking-tighter text-xl">KUMON<span class="text-emerald-500">AI</span></h1>
+        </div>
+        <div class="flex items-center gap-4">
+            <button id="btnSettings" class="p-2 text-zinc-400 hover:text-white transition-colors relative">
+                <i class="fa-solid fa-gear"></i>
+                <div id="keyMissingBadge" class="hidden absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full"></div>
             </button>
+            <button id="btnHistory" class="p-2 text-zinc-400 hover:text-white transition-colors"><i class="fa-solid fa-clock-rotate-left"></i></button>
         </div>
     </header>
 
-    <main class="max-w-5xl mx-auto px-4 py-6 md:py-8">
+    <main class="max-w-6xl mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        <!-- Main Interface -->
-        <div id="mainView" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
-            <!-- Left Column: Camera/Capture -->
-            <section class="space-y-6">
-                <div class="relative aspect-[3/4] bg-zinc-900 rounded-[2rem] overflow-hidden border border-white/5 shadow-2xl group">
+        <!-- Left: Camera (7 Columns) -->
+        <div class="lg:col-span-7 space-y-6">
+            <div class="relative aspect-[4/3] bg-zinc-900 rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
+                <div id="camView" class="h-full w-full relative">
+                    <video id="videoFeed" autoplay playsinline muted class="w-full h-full object-cover brightness-110 contrast-125"></video>
                     
-                    <!-- Live Camera Feed -->
-                    <div id="cameraContainer" class="h-full w-full relative">
-                        <video id="videoStream" autoplay playsinline muted class="grayscale-[0.1] contrast-[1.05]"></video>
-                        
-                        <!-- Camera Overlay UI -->
-                        <div class="absolute inset-0 pointer-events-none border-[30px] border-black/20">
-                            <div class="h-full w-full border border-emerald-500/30 rounded-xl relative">
-                                <div class="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-emerald-500"></div>
-                                <div class="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-emerald-500"></div>
-                                <div class="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-emerald-500"></div>
-                                <div class="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-emerald-500"></div>
+                    <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+                        <div class="w-4/5 h-4/5 border-2 border-dashed border-emerald-500/30 rounded-2xl relative">
+                            <div class="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-emerald-500 rounded-tl-md"></div>
+                            <div class="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-emerald-500 rounded-tr-md"></div>
+                            <div class="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-emerald-500 rounded-bl-md"></div>
+                            <div class="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-emerald-500 rounded-br-md"></div>
+                        </div>
+                    </div>
+
+                    <div class="absolute bottom-6 left-0 right-0 flex justify-center">
+                        <button id="snap" class="group relative flex items-center justify-center">
+                            <div class="absolute w-20 h-20 bg-emerald-500/20 rounded-full animate-ping"></div>
+                            <div class="w-16 h-16 bg-white rounded-full border-4 border-zinc-800 flex items-center justify-center group-hover:scale-110 transition-transform active:scale-90">
+                                <i class="fa-solid fa-camera text-zinc-900 text-xl"></i>
                             </div>
-                        </div>
-
-                        <!-- Shutter Button -->
-                        <div class="absolute bottom-8 left-0 right-0 flex justify-center pointer-events-auto">
-                            <button id="captureBtn" class="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-2xl hover:scale-105 active:scale-90 transition-all border-8 border-zinc-800">
-                                <div class="w-12 h-12 bg-zinc-900 rounded-full flex items-center justify-center group-hover:bg-emerald-500 transition-colors">
-                                    <i class="fa-solid fa-camera text-white"></i>
-                                </div>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Preview/Review Layer -->
-                    <div id="previewLayer" class="hidden absolute inset-0 bg-black">
-                        <img id="previewImage" src="" class="h-full w-full object-contain">
-                        <div class="absolute top-6 right-6 flex gap-2">
-                            <button id="resetBtn" class="p-4 bg-black/60 backdrop-blur-md rounded-2xl text-white hover:bg-rose-500 transition-colors border border-white/10">
-                                <i class="fa-solid fa-rotate-left"></i>
-                            </button>
-                        </div>
+                        </button>
                     </div>
                 </div>
 
-                <!-- Secondary Actions -->
-                <div class="flex gap-4">
-                    <label class="flex-1 bg-zinc-900 border border-white/5 p-4 rounded-2xl flex items-center justify-center gap-3 cursor-pointer hover:bg-zinc-800 transition-all active:scale-95">
-                        <i class="fa-solid fa-upload text-emerald-500"></i>
-                        <span class="text-sm font-bold">Upload File</span>
-                        <input type="file" id="fileInput" accept="image/*" class="hidden">
-                    </label>
-                    <button id="switchCam" class="p-4 bg-zinc-900 border border-white/5 rounded-2xl text-emerald-500 hover:bg-zinc-800 transition-all">
-                        <i class="fa-solid fa-arrows-rotate"></i>
-                    </button>
-                </div>
-
-                <!-- Guidance -->
-                <div class="bg-zinc-900/50 border border-white/5 rounded-2xl p-6">
-                    <h3 class="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-4">Accuracy Tips</h3>
-                    <ul class="space-y-3 text-sm text-zinc-400">
-                        <li class="flex gap-3"><span class="text-emerald-500 font-mono">01</span><span>Keep paper flat on table</span></li>
-                        <li class="flex gap-3"><span class="text-emerald-500 font-mono">02</span><span>Ensure plenty of top-down light</span></li>
-                    </ul>
-                </div>
-            </section>
-
-            <!-- Right Column: Results -->
-            <section class="space-y-6">
-                <div class="bg-zinc-900 rounded-[2rem] border border-white/5 overflow-hidden flex flex-col min-h-[500px] shadow-2xl">
-                    <div class="p-6 border-b border-white/5 flex items-center justify-between bg-zinc-900/50">
-                        <h2 class="font-bold text-lg flex items-center gap-2">
-                            <i class="fa-solid fa-magnifying-glass-chart text-emerald-500"></i>
-                            Analysis
-                        </h2>
-                        <div id="loadingStatus" class="hidden flex items-center gap-2 text-emerald-500 text-xs font-mono">
-                            <div class="loader"></div>
-                            <span>GRADING...</span>
-                        </div>
-                    </div>
-
-                    <div id="resultsContainer" class="flex-1 p-6 overflow-y-auto">
-                        <!-- Empty State -->
-                        <div id="emptyState" class="h-full flex flex-col items-center justify-center text-center py-20 opacity-40">
-                            <i class="fa-solid fa-file-signature text-5xl mb-4"></i>
-                            <p class="text-sm max-w-[200px]">Snap your worksheet to start grading</p>
-                        </div>
-
-                        <!-- Results View -->
-                        <div id="analysisView" class="hidden space-y-6">
-                            <div class="grid grid-cols-2 gap-4">
-                                <div class="bg-zinc-800/50 p-5 rounded-3xl border border-white/5">
-                                    <p class="text-[10px] font-mono text-zinc-500 uppercase mb-1">Checked</p>
-                                    <p id="totalCount" class="text-3xl font-black">0</p>
-                                </div>
-                                <div class="bg-emerald-500/10 p-5 rounded-3xl border border-emerald-500/20">
-                                    <p class="text-[10px] font-mono text-emerald-500 uppercase mb-1">Score</p>
-                                    <p id="correctCount" class="text-3xl font-black text-emerald-400">0</p>
-                                </div>
-                            </div>
-                            
-                            <div class="space-y-3" id="resultsList"></div>
-                            
-                            <button onclick="resetApp()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-5 rounded-2xl transition-all shadow-xl shadow-emerald-500/10 active:scale-95">
-                                START NEW CHECK
-                            </button>
-                        </div>
+                <div id="reviewView" class="hidden absolute inset-0 bg-black">
+                    <img id="takenPhoto" class="w-full h-full object-contain">
+                    <div class="absolute top-4 right-4 flex gap-2">
+                        <button id="cancel" class="glass px-4 py-2 rounded-full text-sm font-bold text-rose-400 hover:bg-rose-500/10"><i class="fa-solid fa-xmark mr-2"></i>Retake</button>
                     </div>
                 </div>
-            </section>
+            </div>
+
+            <div class="flex gap-4">
+                <button id="switch" class="flex-1 glass p-4 rounded-2xl text-sm font-bold hover:bg-white/5 transition-all flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-camera-rotate text-emerald-500"></i> Flip Camera
+                </button>
+                <label class="flex-1 glass p-4 rounded-2xl text-sm font-bold hover:bg-white/5 transition-all flex items-center justify-center gap-3 cursor-pointer">
+                    <i class="fa-solid fa-file-arrow-up text-emerald-500"></i> Upload File
+                    <input type="file" id="upload" class="hidden" accept="image/*">
+                </label>
+            </div>
         </div>
 
-        <!-- History Overlay -->
-        <div id="historyLayer" class="hidden fixed inset-0 z-[60] bg-black/90 backdrop-blur-md p-6 overflow-y-auto">
-            <div class="max-w-xl mx-auto space-y-6">
-                <div class="flex items-center justify-between">
-                    <h2 class="text-2xl font-black">Past Checks</h2>
-                    <button id="closeHistory" class="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+        <!-- Right: Results -->
+        <div class="lg:col-span-5 space-y-6">
+            <div class="glass rounded-3xl min-h-[500px] flex flex-col overflow-hidden">
+                <div class="p-6 border-b border-white/5 flex items-center justify-between">
+                    <h2 class="font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-microchip text-emerald-500"></i> AI Grading
+                    </h2>
+                    <div id="status" class="hidden flex items-center gap-3 text-emerald-400 text-xs font-mono">
+                        <div class="loader"></div> READING...
+                    </div>
                 </div>
-                <div id="historyItems" class="space-y-4"></div>
+
+                <div id="resultContent" class="flex-1 p-6 overflow-y-auto max-h-[600px]">
+                    <div id="empty" class="h-full flex flex-col items-center justify-center text-center opacity-30 py-20">
+                        <i class="fa-solid fa-file-circle-question text-6xl mb-4"></i>
+                        <p class="text-sm">Align worksheet within the frame<br>and tap the camera button.</p>
+                    </div>
+
+                    <div id="grades" class="hidden space-y-6">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="glass p-5 rounded-2xl text-center">
+                                <p class="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Grade</p>
+                                <p id="finalScore" class="text-4xl font-black text-emerald-500">A</p>
+                            </div>
+                            <div class="glass p-5 rounded-2xl text-center">
+                                <p class="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Accuracy</p>
+                                <p id="accuracyCount" class="text-4xl font-black text-white">0/0</p>
+                            </div>
+                        </div>
+                        <div id="breakdown" class="space-y-3"></div>
+                        <button onclick="location.reload()" class="w-full py-4 bg-emerald-500 text-black font-black rounded-2xl hover:bg-emerald-400 transition-all shadow-xl shadow-emerald-500/10">NEW SESSION</button>
+                    </div>
+                </div>
             </div>
         </div>
     </main>
 
-    <canvas id="captureCanvas" class="hidden"></canvas>
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="hidden fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
+        <div class="glass max-w-md w-full p-8 rounded-[2.5rem] space-y-6 border border-white/10">
+            <div class="flex justify-between items-center">
+                <h3 class="text-xl font-bold">AI Configuration</h3>
+                <button id="closeSettings" class="text-zinc-500 hover:text-white p-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <!-- Get Key CTA -->
+            <div class="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl space-y-3">
+                <p class="text-xs text-emerald-400 font-semibold flex items-center gap-2">
+                    <i class="fa-solid fa-circle-info"></i> No API Key yet?
+                </p>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">You need a free Gemini API key from Google AI Studio to use the grading features.</p>
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="block w-full py-2 bg-emerald-500 text-black text-center text-xs font-black rounded-xl hover:bg-emerald-400 transition-all">
+                    GET FREE API KEY <i class="fa-solid fa-arrow-up-right-from-square ml-1"></i>
+                </a>
+            </div>
+
+            <div class="space-y-4">
+                <div class="space-y-2">
+                    <label class="text-[10px] font-mono uppercase text-zinc-500 tracking-widest">Gemini API Key</label>
+                    <div class="relative">
+                        <input type="password" id="apiKeyInput" placeholder="Paste your key here..." class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-emerald-400 focus:outline-none focus:border-emerald-500 text-sm">
+                        <button id="toggleKeyVisibility" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="flex gap-2">
+                    <button id="saveKey" class="flex-1 py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-all text-sm">Save Key</button>
+                    <button id="testKey" class="px-4 py-3 glass text-white font-bold rounded-xl hover:bg-white/10 transition-all text-sm">
+                        <i class="fa-solid fa-vial"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <p id="keyStatusMsg" class="text-center text-[10px] font-medium hidden"></p>
+        </div>
+    </div>
+
+    <canvas id="canvas" class="hidden"></canvas>
 
     <script>
-        const apiKey = "";
         let stream = null;
-        let useFront = false;
-        let history = JSON.parse(localStorage.getItem('kumon_history') || '[]');
-
+        let facingMode = "environment";
+        const storageKey = 'KUMON_AI_KEY';
+        
         const ui = {
-            video: document.getElementById('videoStream'),
-            captureBtn: document.getElementById('captureBtn'),
-            resetBtn: document.getElementById('resetBtn'),
-            switchBtn: document.getElementById('switchCam'),
-            fileInput: document.getElementById('fileInput'),
-            previewLayer: document.getElementById('previewLayer'),
-            previewImg: document.getElementById('previewImage'),
-            loadingStatus: document.getElementById('loadingStatus'),
-            emptyState: document.getElementById('emptyState'),
-            analysisView: document.getElementById('analysisView'),
-            resultsList: document.getElementById('resultsList'),
-            totalCount: document.getElementById('totalCount'),
-            correctCount: document.getElementById('correctCount'),
-            toggleHistory: document.getElementById('toggleHistory'),
-            historyLayer: document.getElementById('historyLayer'),
-            closeHistory: document.getElementById('closeHistory'),
-            historyItems: document.getElementById('historyItems'),
-            canvas: document.getElementById('captureCanvas')
+            video: document.getElementById('videoFeed'),
+            snap: document.getElementById('snap'),
+            cancel: document.getElementById('cancel'),
+            review: document.getElementById('reviewView'),
+            photo: document.getElementById('takenPhoto'),
+            status: document.getElementById('status'),
+            empty: document.getElementById('empty'),
+            grades: document.getElementById('grades'),
+            breakdown: document.getElementById('breakdown'),
+            finalScore: document.getElementById('finalScore'),
+            accuracy: document.getElementById('accuracyCount'),
+            canvas: document.getElementById('canvas'),
+            settings: document.getElementById('settingsModal'),
+            keyInput: document.getElementById('apiKeyInput'),
+            keyBadge: document.getElementById('keyMissingBadge'),
+            keyMsg: document.getElementById('keyStatusMsg')
         };
 
-        // Start Camera
-        async function initCamera() {
-            if (stream) stream.getTracks().forEach(t => t.stop());
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: useFront ? "user" : "environment", width: { ideal: 1280 } } 
-                });
-                ui.video.srcObject = stream;
-            } catch (err) {
-                console.error("Camera failed", err);
+        // Initialize Key State
+        function checkKeyPresence() {
+            const key = localStorage.getItem(storageKey);
+            if (!key) {
+                ui.keyBadge.classList.remove('hidden');
+            } else {
+                ui.keyBadge.classList.add('hidden');
             }
         }
 
-        // Capture Logic
-        ui.captureBtn.onclick = () => {
+        async function startCamera() {
+            if (stream) stream.getTracks().forEach(track => track.stop());
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } }
+                });
+                ui.video.srcObject = stream;
+            } catch (err) {
+                console.error("Camera error:", err);
+            }
+        }
+
+        ui.snap.onclick = () => {
             const ctx = ui.canvas.getContext('2d');
             ui.canvas.width = ui.video.videoWidth;
             ui.canvas.height = ui.video.videoHeight;
             ctx.drawImage(ui.video, 0, 0);
-            const dataUrl = ui.canvas.toDataURL('image/jpeg', 0.8);
-            showPreview(dataUrl);
+            const b64 = ui.canvas.toDataURL('image/jpeg', 0.85);
+            ui.photo.src = b64;
+            ui.review.classList.remove('hidden');
+            analyze(b64);
         };
 
-        function showPreview(url) {
-            ui.previewImg.src = url;
-            ui.previewLayer.classList.remove('hidden');
-            processSheet(url);
-        }
-
-        function resetApp() {
-            ui.previewLayer.classList.add('hidden');
-            ui.analysisView.classList.add('hidden');
-            ui.emptyState.classList.remove('hidden');
-            ui.loadingStatus.classList.add('hidden');
-            initCamera();
-        }
-
-        ui.resetBtn.onclick = resetApp;
-        ui.switchBtn.onclick = () => { useFront = !useFront; initCamera(); };
-        ui.fileInput.onchange = (e) => {
-            const reader = new FileReader();
-            reader.onload = (ev) => showPreview(ev.target.result);
-            reader.readAsDataURL(e.target.files[0]);
+        ui.cancel.onclick = () => {
+            ui.review.classList.add('hidden');
+            ui.grades.classList.add('hidden');
+            ui.empty.classList.remove('hidden');
         };
 
-        // AI Logic
-        async function processSheet(b64) {
-            ui.loadingStatus.classList.remove('hidden');
-            ui.emptyState.classList.add('hidden');
-            
-            const prompt = "Grade this math worksheet. Return JSON array: [{'q':'Problem','user':'Detected Answer','ok':true/false}]";
-            
+        document.getElementById('switch').onclick = () => {
+            facingMode = facingMode === "user" ? "environment" : "user";
+            startCamera();
+        };
+
+        async function analyze(b64Data) {
+            const key = localStorage.getItem(storageKey) || "";
+            if (!key) {
+                ui.settings.classList.remove('hidden');
+                ui.status.classList.add('hidden');
+                return;
+            }
+
+            ui.status.classList.remove('hidden');
+            ui.empty.classList.add('hidden');
+            ui.grades.classList.add('hidden');
+
+            const cleanB64 = b64Data.split(',')[1];
+            const prompt = "Act as a Kumon instructor. Grade this math worksheet. Return a JSON array of objects: {problem: string, user_answer: string, correct_answer: string, is_correct: boolean}. Include a 'final_grade' (A-F) and 'summary' string.";
+
             try {
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: "image/jpeg", data: b64.split(',')[1] } }] }],
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                { inlineData: { mimeType: "image/jpeg", data: cleanB64 } }
+                            ]
+                        }],
                         generationConfig: { responseMimeType: "application/json" }
                     })
                 });
 
-                const json = await res.json();
-                const data = JSON.parse(json.candidates[0].content.parts[0].text);
-                renderResults(data);
-                saveHistory(data);
+                if (!response.ok) throw new Error("API Error");
+                const result = await response.json();
+                const data = JSON.parse(result.candidates[0].content.parts[0].text);
+                showResults(data);
             } catch (err) {
-                alert("AI error. Please ensure the image is bright and sharp.");
-                resetApp();
+                console.error(err);
+                alert("AI Analysis failed. Check your API key in Settings.");
+                ui.status.classList.add('hidden');
+                ui.empty.classList.remove('hidden');
             }
         }
 
-        function renderResults(data) {
-            ui.loadingStatus.classList.add('hidden');
-            ui.analysisView.classList.remove('hidden');
-            ui.resultsList.innerHTML = '';
+        function showResults(data) {
+            ui.status.classList.add('hidden');
+            ui.grades.classList.remove('hidden');
+            ui.breakdown.innerHTML = '';
+
+            const items = Array.isArray(data) ? data : (data.results || []);
+            const correctCount = items.filter(i => i.is_correct).length;
             
-            const ok = data.filter(d => d.ok).length;
-            ui.totalCount.innerText = data.length;
-            ui.correctCount.innerText = `${ok}/${data.length}`;
-            
-            data.forEach(item => {
-                const div = document.createElement('div');
-                div.className = `p-4 rounded-2xl border flex items-center justify-between ${item.ok ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`;
-                div.innerHTML = `
+            ui.finalScore.innerText = data.final_grade || (items.length > 0 && correctCount/items.length > 0.8 ? "A" : "B");
+            ui.accuracy.innerText = `${correctCount}/${items.length}`;
+
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-xl border flex justify-between items-center transition-all ${item.is_correct ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`;
+                card.innerHTML = `
                     <div class="flex items-center gap-3">
-                        <i class="fa-solid ${item.ok ? 'fa-circle-check text-emerald-500' : 'fa-circle-xmark text-rose-500'} text-xl"></i>
+                        <i class="fa-solid ${item.is_correct ? 'fa-check text-emerald-500' : 'fa-xmark text-rose-500'}"></i>
                         <div>
-                            <p class="font-bold text-sm text-zinc-200">${item.q}</p>
-                            <p class="text-[10px] text-zinc-500 font-mono">DETECTED: ${item.user}</p>
+                            <p class="text-xs font-bold text-zinc-300">${item.problem}</p>
+                            <p class="text-[10px] text-zinc-500">User: ${item.user_answer} | Correct: ${item.correct_answer}</p>
                         </div>
                     </div>
                 `;
-                ui.resultsList.appendChild(div);
+                ui.breakdown.appendChild(card);
             });
         }
 
-        // History Management
-        function saveHistory(data) {
-            const entry = { date: new Date().toLocaleString(), score: `${data.filter(d => d.ok).length}/${data.length}` };
-            history.unshift(entry);
-            localStorage.setItem('kumon_history', JSON.stringify(history.slice(0, 10)));
-        }
-
-        ui.toggleHistory.onclick = () => {
-            ui.historyItems.innerHTML = history.map(h => `
-                <div class="bg-zinc-900 border border-white/5 p-4 rounded-2xl flex justify-between items-center">
-                    <span class="text-xs font-mono text-zinc-400">${h.date}</span>
-                    <span class="font-black text-emerald-400">${h.score}</span>
-                </div>
-            `).join('') || '<p class="text-center text-zinc-500">No history yet</p>';
-            ui.historyLayer.classList.remove('hidden');
+        // Settings Logic
+        document.getElementById('btnSettings').onclick = () => {
+            ui.keyInput.value = localStorage.getItem(storageKey) || "";
+            ui.settings.classList.remove('hidden');
+            ui.keyMsg.classList.add('hidden');
+        };
+        document.getElementById('closeSettings').onclick = () => ui.settings.classList.add('hidden');
+        
+        document.getElementById('saveKey').onclick = () => {
+            localStorage.setItem(storageKey, ui.keyInput.value.trim());
+            checkKeyPresence();
+            ui.keyMsg.innerText = "Key saved successfully!";
+            ui.keyMsg.className = "text-center text-[10px] font-medium text-emerald-400 block";
+            setTimeout(() => ui.settings.classList.add('hidden'), 1000);
         };
 
-        ui.closeHistory.onclick = () => ui.historyLayer.classList.add('hidden');
+        document.getElementById('testKey').onclick = async () => {
+            const key = ui.keyInput.value.trim();
+            if(!key) return;
+            ui.keyMsg.innerText = "Testing...";
+            ui.keyMsg.className = "text-center text-[10px] font-medium text-zinc-400 block";
+            
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "hi" }] }] })
+                });
+                if(res.ok) {
+                    ui.keyMsg.innerText = "Connection Working! ✨";
+                    ui.keyMsg.className = "text-center text-[10px] font-medium text-emerald-400 block";
+                } else {
+                    throw new Error();
+                }
+            } catch(e) {
+                ui.keyMsg.innerText = "Invalid Key. Try again.";
+                ui.keyMsg.className = "text-center text-[10px] font-medium text-rose-400 block";
+            }
+        };
 
-        window.onload = initCamera;
+        document.getElementById('toggleKeyVisibility').onclick = () => {
+            const type = ui.keyInput.type === 'password' ? 'text' : 'password';
+            ui.keyInput.type = type;
+            const icon = type === 'password' ? 'fa-eye' : 'fa-eye-slash';
+            document.getElementById('toggleKeyVisibility').innerHTML = `<i class="fa-solid ${icon}"></i>`;
+        };
+
+        window.onload = () => {
+            startCamera();
+            checkKeyPresence();
+        };
     </script>
 </body>
 </html>
